@@ -1,0 +1,29 @@
+; Code Composer Project File, Version 2.0 (do not modify or remove this line)
+
+[Project Settings]
+ProjectDir="E:\Tychinsky\Routine\uavcan\nunavut\nunavut_support_char\tests\"
+ProjectType=Executable
+CPUFamily=TMS320C28XX
+Tool="Compiler"
+Tool="CustomBuilder"
+Tool="Linker"
+Config="Debug"
+Config="Release"
+
+[Source Files]
+Source="$(Proj_dir)\..\third_party\unity\unity.c"
+Source="$(Proj_dir)\test_support.c"
+Source="F280XX.cmd"
+
+["Compiler" Settings: "Debug"]
+Options=-g -pdsw225 -fr"$(Proj_dir)\Debug" -i"$(Proj_dir)\..\src" -i"$(Proj_dir)\..\third_party\unity" -d"_DEBUG" -d"LARGE_MODEL" -d"UNITY_SUPPORT_64" -d"UNITY_INCLUDE_FLOAT" -d"UNITY_INCLUDE_DOUBLE" -ml -v28 --float_support=softlib -c99
+
+["Compiler" Settings: "Release"]
+Options=-pdsw225 -o3 -fr"$(Proj_dir)\Release" -d"LARGE_MODEL" -ml -v28
+
+["Linker" Settings: "Debug"]
+Options=-c -m".\Debug\test_ti.map" -o".\Debug\test_ti.out" -w -x
+
+["Linker" Settings: "Release"]
+Options=-c -m".\Release\test_ti.map" -o".\Release\test_ti.out" -w -x
+
