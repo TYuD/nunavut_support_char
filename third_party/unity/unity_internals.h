@@ -205,6 +205,9 @@
 #endif
 typedef UNITY_FLOAT_TYPE UNITY_FLOAT;
 
+
+#ifndef __TMS320C28XX__ 
+
 /* isinf & isnan macros should be provided by math.h */
 #ifndef isinf
 /* The value of Inf - Inf is NaN */
@@ -215,6 +218,37 @@ typedef UNITY_FLOAT_TYPE UNITY_FLOAT;
 /* NaN is the only floating point value that does NOT equal itself.
  * Therefore if n != n, then it is NaN. */
 #define isnan(n) ((n != n) ? 1 : 0)
+#endif
+
+#else /* isnan & isinf macro are redefined becouse Texas Instruments C2000 Code Generation Tools 5.1.2 gives false for: NaN != NaN */
+ 
+#define IEE32_AS_UINT(x) (*((const uint_fast32_t*)(&x)))
+#define IEE64_AS_UINT(x) (*((const uint_fast64_t*)(&x)))
+
+#define IEE32_EXP_MASK  ( (uint_fast64_t)(0xFF ) << 23)
+#define IEE64_EXP_MASK  ( (uint_fast64_t)(0x7FF) << 52)
+#define IEE32_MANT_MASK (((uint_fast32_t)(1    ) << 23)-1)
+#define IEE64_MANT_MASK (((uint_fast64_t)(1    ) << 52)-1)
+
+#ifndef isnan
+#define __isnanf(x) \
+   ((IEE32_AS_UINT(x) & IEE32_EXP_MASK) == IEE32_EXP_MASK  &&  (IEE32_AS_UINT(x) & IEE32_MANT_MASK) ? 1 : 0)
+#define __isnand(x) \
+   ((IEE64_AS_UINT(x) & IEE64_EXP_MASK) == IEE64_EXP_MASK  &&  (IEE64_AS_UINT(x) & IEE64_MANT_MASK) ? 1 : 0)
+#define isnan(x) \
+  (sizeof(x) == sizeof(float) ? __isnanf(x) : sizeof(x) == sizeof(double) ? __isnand(x) : (x) != (x) ? 1 : 0)
+#endif
+
+#ifndef isinf
+#define __isinff(x) \
+   (((IEE32_AS_UINT(x) & IEE32_EXP_MASK) == IEE32_EXP_MASK  &&  (IEE32_AS_UINT(x) & IEE32_MANT_MASK) == 0) ? 1 : 0)
+#define __isinfd(x) \
+   (((IEE64_AS_UINT(x) & IEE64_EXP_MASK) == IEE64_EXP_MASK  &&  (IEE64_AS_UINT(x) & IEE64_MANT_MASK) == 0) ? 1 : 0)
+#define isinf(x) \
+  (sizeof(x) == sizeof(float) ? __isinff(x) :__isinfd(x))
+  /*(sizeof(x) == sizeof(float) ? __isinff(x) : sizeof(x) == sizeof(double) ? __isinfd(x) : (isnan((x) - (x)) && !isnan(x) ? 1 : 0))*/
+#endif
+
 #endif
 
 #endif
@@ -1030,4 +1064,4 @@ int UnityTestMatches(void);
 #endif
 
 /* End of UNITY_INTERNALS_H */
-#endif
+#endif 
