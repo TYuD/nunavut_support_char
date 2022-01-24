@@ -79,11 +79,11 @@ static const float Huge32   = 3.402823466e+38F;
 
 static void testNunavutCopyBits(void)
 {
+    unsigned i;
     const uint_fast8_t src[] = { x11, x22, x33, x44, x55 };
     uint_fast8_t dst[6];
     memset(dst, 0, sizeof(dst));
     nunavutCopyBits(dst, 0, sizeof(src) * CHAR_BIT, src, 0);
-    unsigned i;
     for( i = 0; i < sizeof(src); ++i)
     {
         TEST_ASSERT_EQUAL_UINT8(src[i], dst[i]);
@@ -92,11 +92,11 @@ static void testNunavutCopyBits(void)
 
 static void testNunavutCopyBitsWithAlignedOffset(void)
 {
+    unsigned i;
     const uint_fast8_t src[] = { x11, x22, x33, x44, x55 };
     uint_fast8_t dst[6];
     memset(dst, 0, sizeof(dst));
     nunavutCopyBits(dst, 0, (sizeof(src) - 1) * CHAR_BIT, src, CHAR_BIT);
-    unsigned i;
     for(i = 0; i < sizeof(src) - 1; ++i)
     {
         TEST_ASSERT_EQUAL_UINT8(src[i + 1], dst[i]);
@@ -114,11 +114,11 @@ static void testNunavutCopyBitsWithAlignedOffset(void)
 
 static void testNunavutCopyBitsWithUnalignedOffset(void)
 {
+    unsigned i;
     const uint_fast8_t src[] = { xAA, xAA, xAA, xAA, xAA, xAA };
     uint_fast8_t dst[6];
     memset(dst, 0, sizeof(dst));
     nunavutCopyBits(dst, 0, (sizeof(src)-1) * CHAR_BIT, src, 1);
-    unsigned i;
     for(i = 0; i < sizeof(src) - 1; ++i)
     {
         TEST_ASSERT_EQUAL_HEX8(x55, dst[i]);
@@ -531,10 +531,12 @@ static void testNunavutFloat16Pack_zero(void)
     TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x0, (0x7C00 & packed_float), "0.0f had bits in exponent.");
     TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x0, (0x8000 & packed_float), "0.0f sign bit was negative.");
 
-    packed_float = nunavutFloat16Pack(-0.0f);
-    TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x0000, (0x03FF & packed_float), "-0.0f had bits in significand.");
-    TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x0000, (0x7C00 & packed_float), "-0.0f had bits in exponent.");
-    TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x8000, (0x8000 & packed_float), "-0.0f sign bit was not negative.");
+    #ifndef __TMS320C28XX__ // Texas Instruments C2000 Code Generation Tools 5.1.2 ignores minus sign in zero float
+      packed_float = nunavutFloat16Pack(-0.0f);
+      TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x0000, (0x03FF & packed_float), "-0.0f had bits in significand.");
+      TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x0000, (0x7C00 & packed_float), "-0.0f had bits in exponent.");
+      TEST_ASSERT_EQUAL_HEX16_MESSAGE(0x8000, (0x8000 & packed_float), "-0.0f sign bit was not negative.");
+    #endif
 }
 
 // +--------------------------------------------------------------------------+
@@ -579,10 +581,13 @@ static void helperPackUnpack(float source_value, uint_fast16_t compare_mask, uns
     uint_fast16_t repacked = packed;
     char message_buffer[128];
     unsigned i;
+    message_buffer[0] = '\0';;
     for(i = 0; i < iterations; ++i)
     {
         repacked = nunavutFloat16Pack(nunavutFloat16Unpack(repacked));
-        snprintf(message_buffer, 128, "source_value=%f, compare_mask=%X, i=%zu", source_value, compare_mask, i);
+        #ifndef __TMS320C28XX__ // Texas Instruments C2000 Code Generation Tools 5.1.2 hangs in the snprintf
+          snprintf(message_buffer, 128, "source_value=%f, compare_mask=%X, i=%zu", source_value, compare_mask, i);
+        #endif
         TEST_ASSERT_EQUAL_HEX16_MESSAGE(packed & compare_mask, repacked & compare_mask, message_buffer);
     }
 }
@@ -660,8 +665,8 @@ static void helperAssertSerFloat32SameAsIEEE(const float original_value, const v
             uint_fast32_t negative : 1 ;
         } ieee;
     } AsInt;
-    AsInt original; original.f = original_value;
     const AsInt* serialized = (const AsInt*)serialized_result;
+    AsInt original; original.f = original_value;
 
     TEST_ASSERT_EQUAL_HEX32_MESSAGE( original.ieee.mantissa, serialized->ieee.mantissa, "Mantissa did not match.");
     TEST_ASSERT_EQUAL_HEX8_MESSAGE ( original.ieee.exponent, serialized->ieee.exponent, "Exponent did not match.");
@@ -701,27 +706,29 @@ static void testNunavutSetF32(void)
 
 static void testNunavutGetF32(void)
 {
+    const uint_fast32_t neg_inf = 0xff800000;
+    const uint_fast32_t inf     = 0x7f800000;
+    const uint_fast32_t nan     = 0x7fc00000;
+    const uint_fast32_t pi      = 0x4048f5c3;
+    float result;
+
     // >>> hex(int.from_bytes(np.array([-np.float32('infinity')]).tobytes(), 'little'))
     // '0xff800000'
-    const uint_fast32_t neg_inf = 0xff800000;
-    float result = nunavutGetF32(&neg_inf, sizeof(neg_inf), 0);
+    result = nunavutGetF32(&neg_inf, sizeof(neg_inf), 0);
     TEST_ASSERT_FLOAT_IS_NEG_INF(result);
 
     // >>> hex(int.from_bytes(np.array([np.float32('infinity')]).tobytes(), 'little'))
     // '0x7f800000'
-    const uint_fast32_t inf = 0x7f800000;
     result = nunavutGetF32(&inf, sizeof(inf), 0);
     TEST_ASSERT_FLOAT_IS_INF(result);
 
     // >>> hex(int.from_bytes(np.array([np.float32('nan')]).tobytes(), 'little'))
     // '0x7fc00000'
-    const uint_fast32_t nan = 0x7fc00000;
     result = nunavutGetF32(&nan, sizeof(nan), 0);
     TEST_ASSERT_FLOAT_IS_NAN(result);
 
     // >>> hex(int.from_bytes(np.array([np.float32('3.14')]).tobytes(), 'little'))
     // '0x4048f5c3'
-    const uint_fast32_t pi = 0x4048f5c3;
     result = nunavutGetF32(&pi, sizeof(pi), 0);
     TEST_ASSERT_EQUAL_FLOAT(3.14f, result);
 }
@@ -732,27 +739,29 @@ static void testNunavutGetF32(void)
 
 static void testNunavutGetF64(void)
 {
+    const uint64_t pi      = 0x400921fb54442d18;
+    const uint64_t inf     = 0x7ff0000000000000;
+    const uint64_t neg_inf = 0xfff0000000000000;
+    const uint64_t nan     = 0x7ff8000000000000;
+    double result;
+
     // >>> hex(int.from_bytes(np.array([np.float64('3.141592653589793')]).tobytes(), 'little'))
     // '0x400921fb54442d18'
-    const uint64_t pi = 0x400921fb54442d18;
-    double result = nunavutGetF64(&pi, sizeof(pi), 0);
+    result = nunavutGetF64(&pi, sizeof(pi), 0);
     TEST_ASSERT_EQUAL_DOUBLE(3.141592653589793, result);
 
     // >>> hex(int.from_bytes(np.array([np.float64('infinity')]).tobytes(), 'little'))
     // '0x7ff0000000000000'
-    const uint64_t inf = 0x7ff0000000000000;
     result = nunavutGetF64(&inf, sizeof(inf), 0);
     TEST_ASSERT_DOUBLE_IS_INF(result);
 
     // >>> hex(int.from_bytes(np.array([-np.float64('infinity')]).tobytes(), 'little'))
     // '0xfff0000000000000'
-    const uint64_t neg_inf = 0xfff0000000000000;
     result = nunavutGetF64(&neg_inf, sizeof(neg_inf), 0);
     TEST_ASSERT_DOUBLE_IS_NEG_INF(result);
 
     // >>> hex(int.from_bytes(np.array([np.float64('nan')]).tobytes(), 'little'))
     // '0x7ff8000000000000'
-    const uint64_t nan = 0x7ff8000000000000;
     result = nunavutGetF64(&nan, sizeof(nan), 0);
     TEST_ASSERT_DOUBLE_IS_NAN(result);
 }
@@ -775,8 +784,8 @@ static void helperAssertSerFloat64SameAsIEEE(const double original_value, const 
             uint64_t negative : 1 ;
         } ieee;
     } AsInt;
-    AsInt original; original.f = original_value;
     const AsInt* serialized = (const AsInt*)serialized_result;
+    AsInt original; original.f = original_value;
 
     TEST_ASSERT_EQUAL_HEX64_MESSAGE( original.ieee.mantissa, serialized->ieee.mantissa, "Mantissa did not match.");
     TEST_ASSERT_EQUAL_HEX16_MESSAGE( original.ieee.exponent, serialized->ieee.exponent, "Exponent did not match.");
@@ -876,8 +885,10 @@ int main(void)
     RUN_TEST(testNunavutGetF16);
     RUN_TEST(testNunavutSetF32);
     RUN_TEST(testNunavutGetF32);
-    RUN_TEST(testNunavutGetF64);
-    RUN_TEST(testNunavutSetF64);
-
+    if( sizeof(double)*CHAR_BIT == 64 )
+    {
+      RUN_TEST(testNunavutGetF64);
+      RUN_TEST(testNunavutSetF64);
+    }
     return UNITY_END();
-}
+} 
