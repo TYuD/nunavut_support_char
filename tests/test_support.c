@@ -2,6 +2,22 @@
 //
 // Tests the common functionality provided by the Nunavut support headers.
 
+#include <assert.h>
+
+#define NUNAVUT_ASSERT assert
+
+#ifdef __ADSPTS__
+  //#define static_assert(cond,msg) typedef int static_assert_foo_t[(cond) ? 1 : -1]
+  
+  #define ASSERT_CONCAT_(a,b) a##b
+  #define ASSERT_CONCAT(a,b) ASSERT_CONCAT_(a,b)
+  #ifdef __COUNTER__
+    #define static_assert(e,m) enum { ASSERT_CONCAT(static_assert_,__COUNTER__) = 1/(!!(e)) }
+  #else
+    #define static_assert(e,m) enum { ASSERT_CONCAT(assert_line_,__LINE__) = 1/(!!(e)) }
+  #endif  
+#endif
+
 #include "serialization.h"
 #include "unity.h"  // Include 3rd-party headers afterward to ensure that our header is self-sufficient.
 
@@ -891,4 +907,4 @@ int main(void)
       RUN_TEST(testNunavutSetF64);
     }
     return UNITY_END();
-} 
+}
